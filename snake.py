@@ -19,6 +19,7 @@ WHITE = (255, 255, 255)
 
 # Variables divers
 BLOCK_SIZE = 20
+SCORE_HEIGHT = 60
 score = 0
 speed = 1
 fps = 5 + speed
@@ -27,7 +28,7 @@ num_obstacles = 5
 obstacles = [
     (
         random.randint(0, (WIDTH // BLOCK_SIZE) - 1) * BLOCK_SIZE,
-        random.randint(0, (HEIGHT // BLOCK_SIZE) - 1) * BLOCK_SIZE,
+        random.randint((SCORE_HEIGHT // BLOCK_SIZE), (HEIGHT // BLOCK_SIZE) - 1) * BLOCK_SIZE,
     )
     for _ in range(num_obstacles)
 ]
@@ -58,6 +59,15 @@ pygame.mixer.music.play(-1) # -1 permet de jouer le son en boucle
 # Réglage du volume
 bite_sound.set_volume(1.0)
 pygame.mixer.music.set_volume(0.5)
+
+# Fonction pour générer une position dans la zone de jeux
+def generate_position():
+    while True:
+        x = random.randint(0, (WIDTH // BLOCK_SIZE) - 1) * BLOCK_SIZE
+        y = random.randint((SCORE_HEIGHT // BLOCK_SIZE), (HEIGHT // BLOCK_SIZE) - 1) * BLOCK_SIZE
+        position = (x, y)
+        if position not in snake and position not in obstacles:
+            return position
 
 # -----   Fonction du serpent   -----
 # Position initiale du serpent (x, y)
@@ -108,19 +118,19 @@ def draw_obstacle():
 def generate_obstacle():
     obs = []
     while num_obstacles != len(obs):
-        element = (
-            random.randint(0, (WIDTH // BLOCK_SIZE) - 1) * BLOCK_SIZE,
-            random.randint(0, (HEIGHT // BLOCK_SIZE) - 1) * BLOCK_SIZE,
-        )
-        next_position = (snake[0][0] + snake_dx, snake[0][1] + snake_dy)
-        if element not in snake and element != next_position:
+        element = generate_position()
+        next_position = [
+            (snake[0][0] + (snake_dx * i), snake[0][1] + (snake_dy * i))
+            for i in range(1, 6)
+        ]
+        if element not in snake and element not in next_position:
             obs.append(element)
     return obs   
 
 # -----   Fonction de la nourriture   -----
 # Position de la nourriture
 food_x = random.randint(0, (WIDTH // BLOCK_SIZE) -1) * BLOCK_SIZE
-food_y = random.randint(0, (HEIGHT // BLOCK_SIZE) -1) * BLOCK_SIZE
+food_y = random.randint((SCORE_HEIGHT // BLOCK_SIZE), (HEIGHT // BLOCK_SIZE) -1) * BLOCK_SIZE
 
 # Fonction pour dessiner la pomme
 def draw_food():
@@ -128,10 +138,7 @@ def draw_food():
     
 # Fonction pour générer de nouvelles coordonnées pour la nourriture
 def generate_food():
-    food = (
-        random.randint(0, (WIDTH // BLOCK_SIZE) -1) * BLOCK_SIZE,
-        random.randint(0, (HEIGHT // BLOCK_SIZE) -1) * BLOCK_SIZE
-    )
+    food = generate_position()
     if food in obstacles or food in snake:
         return generate_food()
     return food
@@ -139,8 +146,8 @@ def generate_food():
 # ----- Fonction pour les affichages -----
 # Fonction pour afficher le score à l'écran
 def display_score():
-    score_text = lcd_font.render(f'SCORE : {score} - VITESSE : {speed}', True, BLACK)
-    WINDOW.blit(score_text, (10, 10)) # on affiche le score en haut à gauche
+    score_text = lcd_font.render(f'SCORE : {score} - VITESSE : {speed}', True, GREEN)
+    WINDOW.blit(score_text, ((WIDTH - score_text.get_width()) // 2, (SCORE_HEIGHT - score_text.get_height()) // 2)) # on affiche le score en haut à gauche
 
 # Fonction pour afficher le texte
 def display_message(text, color):
@@ -154,6 +161,11 @@ def display_message(text, color):
         pygame.time.delay(2000) # Pause de 2 second avant de fermer
 
 # ----- Fonction du jeux -----
+# Pour dessiner le cadre
+def draw_game_frame():
+    pygame.draw.rect(WINDOW, BLACK, (0, 0, WIDTH, SCORE_HEIGHT)) # Zone pour afficher le score
+    pygame.draw.line(WINDOW, WHITE, (0, SCORE_HEIGHT), (WIDTH, SCORE_HEIGHT), 3) # Ligne de séparation
+
 # Boucle principale
 def main():
     global snake_dx, snake_dy, food_x, food_y, score, speed, obstacles, paused
@@ -202,7 +214,7 @@ def main():
         # Vérifier les collisions avec les bords et lui-même
         if (
             snake[0][0] < 0 or snake[0][0] >= WIDTH or
-            snake[0][1] < 0 or snake[0][1] >= HEIGHT
+            snake[0][1] < SCORE_HEIGHT or snake[0][1] >= HEIGHT
         ) or len(snake) > 2 and snake[0] in snake[1:] or check_obstacle_collision(): # Ajouter la vérification avec lui-même
             WINDOW.fill(BLACK)
             pygame.mixer.music.stop()
@@ -222,8 +234,11 @@ def main():
         else:
             snake.pop() # Retirer le dernier segment si pas de nourriture mangée
 
-        # Remplir l'écran de noir
+        # Remplir l'écran
         WINDOW.fill(SCREEN)
+        
+        # Dessiner le cadre
+        draw_game_frame()
         
         # On affiche le score
         display_score()
@@ -255,6 +270,6 @@ def main():
     # Quitter Pygame
     pygame.quit()
     sys.exit()
-
-if __name__ == "__main__":
+    
+if __name__ == '__main__':
     main()
