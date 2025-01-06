@@ -6,7 +6,7 @@ import random
 pygame.init()
 
 # Dimensions de la fenêtre
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1200, 900
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Snake Game - Ludovic")
 
@@ -18,8 +18,8 @@ RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 
 # Variables divers
-BLOCK_SIZE = 20
-SCORE_HEIGHT = 60
+BLOCK_SIZE = 30
+SCORE_HEIGHT = 90
 SCORE_FILE = 'scores.txt'
 score = 0
 speed = 1
@@ -34,7 +34,9 @@ obstacles = [
     for _ in range(num_obstacles)
 ]
 paused = False
-
+score_100 = [i*100 for i in range(1, 50)]
+score_200 = [i*200 for i in range(1, 50)]
+score_bonus = [i-20 for i in score_100]
 
  # Charger la police depuis les assets
 font = pygame.font.Font('assets/hack.ttf', 40)
@@ -43,12 +45,16 @@ lcd_font = pygame.font.Font('assets/nokia.ttf', 30)
 # Charger et adapter les images
 apple_img = pygame.image.load('assets/apple.png')
 apple_img = pygame.transform.scale(apple_img, (BLOCK_SIZE, BLOCK_SIZE))
-rock_img = pygame.image.load('assets/boulder.png')
+pumpkin_img = pygame.image.load('assets/pumpkin.png')
+pumpkin_img = pygame.transform.scale(pumpkin_img, (BLOCK_SIZE, BLOCK_SIZE))
+rock_img = pygame.image.load('assets/tile_064.png')
 rock_img = pygame.transform.scale(rock_img, (BLOCK_SIZE, BLOCK_SIZE))
 head_img = pygame.image.load('assets/head_snake.png')
 head_img = pygame.transform.scale(head_img, (BLOCK_SIZE, BLOCK_SIZE))
 body_img = pygame.image.load('assets/body_snake.png')
 body_img = pygame.transform.scale(body_img, (BLOCK_SIZE, BLOCK_SIZE))
+end_img = pygame.image.load('assets/end_snake.png')
+end_img = pygame.transform.scale(end_img, (BLOCK_SIZE, BLOCK_SIZE))
 
 # Charger la musique
 bite_sound = pygame.mixer.Sound('assets/apple_bite.ogg')
@@ -60,7 +66,7 @@ pygame.mixer.music.play(-1) # -1 permet de jouer le son en boucle
 
 # Réglage du volume
 bite_sound.set_volume(1.0)
-pygame.mixer.music.set_volume(0.5)
+pygame.mixer.music.set_volume(0.3)
 
 # -----   Fonction générale   -----
 # Fonction pour enregistrer le score
@@ -113,6 +119,19 @@ def update_head_direction(dx, dy, image):
     elif dy > 0:
         return pygame.transform.rotate(image, -90)
 
+# Fonction pour envoyer la queue dans le sens de la marche
+def update_tail_direction(prev_segment, curr_segment, end_img):
+    dx = curr_segment[0] - prev_segment[0]
+    dy = curr_segment[1] - prev_segment[1]
+    if dx > 0:
+        return end_img
+    elif dx < 0:
+        return pygame.transform.flip(end_img, True, False)
+    elif dy < 0:
+        return pygame.transform.rotate(end_img, 90)
+    elif dy > 0:
+        return pygame.transform.rotate(end_img, -90)
+
 # -----   Fonction des obstacles   -----
 # Vérifier les collisions avec les obstacles
 def check_obstacle_collision():
@@ -144,8 +163,8 @@ food_x = random.randint(0, (WIDTH // BLOCK_SIZE) -1) * BLOCK_SIZE
 food_y = random.randint((SCORE_HEIGHT // BLOCK_SIZE), (HEIGHT // BLOCK_SIZE) -1) * BLOCK_SIZE
 
 # Fonction pour dessiner la pomme
-def draw_food():
-    WINDOW.blit(apple_img, (food_x, food_y))
+def draw_food(img):
+    WINDOW.blit(img, (food_x, food_y))
     
 # Fonction pour générer de nouvelles coordonnées pour la nourriture
 def generate_food():
@@ -172,7 +191,7 @@ def display_score():
     best = get_best_score()
     if best < score:
         best = score
-    score_text = lcd_font.render(f'SCORE : {score} - VITESSE : {speed} - BEST : {best}', True, GREEN)
+    score_text = lcd_font.render(f'SCORE : {score} - VITESSE : {speed} - OBSTACLE : {num_obstacles} - BEST : {best}', True, GREEN)
     WINDOW.blit(score_text, ((WIDTH - score_text.get_width()) // 2, (SCORE_HEIGHT - score_text.get_height()) // 2)) # on affiche le score en haut à gauche
 
 # Fonction pour afficher le texte
@@ -194,8 +213,9 @@ def draw_game_frame():
 
 # Boucle principale
 def main():
-    global snake_dx, snake_dy, food_x, food_y, score, speed, obstacles, paused
+    global snake_dx, snake_dy, food_x, food_y, score, speed, obstacles, paused, num_obstacles
     head_direction = head_img # Renvoi l'image rectifiée à la création de la tête
+    bonus_food = False
     running = True
     while running:
         # Gestion des événements
@@ -254,8 +274,16 @@ def main():
         if snake[0] == (food_x, food_y):
             bite_sound.play()
             food_x, food_y = generate_food() # Générer la nouvelle position de la nourriture
-            score += 10 # On augmente le score par 10
-            if (score // 100) == speed:
+            if bonus_food:
+                score += 20 # on augmente le score de 20 pour le bonus
+                bonus_food = False
+            else:
+                score += 10 # On augmente le score par 10
+                if score in score_bonus:
+                    bonus_food = True
+            if score in score_200:
+                num_obstacles += 1 # On augmente le nombre d'obstacle
+            if score in score_100:
                 speed += 1 # augmenter la vitesse du serpent
                 obstacles = generate_obstacle() # On change les obstacles
         else:
@@ -274,14 +302,18 @@ def main():
         draw_obstacle()
         
         # Dessiner la nourriture
-        draw_food()
+        if bonus_food:
+            food = pumpkin_img
+        else:
+            food = apple_img
+        draw_food(food)
 
         # Dessiner le serpent
         for index, segment in enumerate(snake):
             if index == 0:
                 WINDOW.blit(head_direction, (segment[0], segment[1]))
             elif index == len(snake) - 1: # pour avoir la queue du serpent
-                pygame.draw.rect(WINDOW, GREEN, (segment[0], segment[1], BLOCK_SIZE, BLOCK_SIZE))
+                WINDOW.blit(update_tail_direction(snake[-2], segment, end_img), (segment[0], segment[1]))
             else:
                 prev_segment = snake[index - 1]
                 next_segment = snake[index + 1]
