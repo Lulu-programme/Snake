@@ -20,6 +20,7 @@ WHITE = (255, 255, 255)
 # Variables divers
 BLOCK_SIZE = 20
 SCORE_HEIGHT = 60
+SCORE_FILE = 'scores.txt'
 score = 0
 speed = 1
 fps = 5 + speed
@@ -33,6 +34,7 @@ obstacles = [
     for _ in range(num_obstacles)
 ]
 paused = False
+
 
  # Charger la police depuis les assets
 font = pygame.font.Font('assets/hack.ttf', 40)
@@ -53,12 +55,21 @@ bite_sound = pygame.mixer.Sound('assets/apple_bite.ogg')
 game_over_sound = pygame.mixer.Sound('assets/game_over.wav')
 
 # charger la musique de fond
-pygame.mixer.music.load('assets/background.mp3')
+pygame.mixer.music.load('assets/victory.mp3')
 pygame.mixer.music.play(-1) # -1 permet de jouer le son en boucle
 
 # Réglage du volume
 bite_sound.set_volume(1.0)
 pygame.mixer.music.set_volume(0.5)
+
+# -----   Fonction générale   -----
+# Fonction pour enregistrer le score
+def save_score(score):
+    try:
+        with open(SCORE_FILE, "a") as file:  # Ouvrir en mode ajout
+            file.write(f"{score}\n")  # Ajouter le score
+    except Exception as e:
+        print(f"Erreur lors de l'enregistrement du score : {e}")
 
 # Fonction pour générer une position dans la zone de jeux
 def generate_position():
@@ -144,9 +155,24 @@ def generate_food():
     return food
 
 # ----- Fonction pour les affichages -----
+# Fonction pour trouver le meilleur score
+def get_best_score():
+    try:
+        with open(SCORE_FILE, 'r') as file: # Ouverture en mode lecture
+            scores = [int(line.strip()) for line in file.readlines()] # Lire les scores
+            return max(scores) if scores else 0
+    except FileNotFoundError:
+        return 0
+    except Exception as e:
+        print(f'Erreur lors de la lecture des scores : {e}')
+        return 0
+
 # Fonction pour afficher le score à l'écran
 def display_score():
-    score_text = lcd_font.render(f'SCORE : {score} - VITESSE : {speed}', True, GREEN)
+    best = get_best_score()
+    if best < score:
+        best = score
+    score_text = lcd_font.render(f'SCORE : {score} - VITESSE : {speed} - BEST : {best}', True, GREEN)
     WINDOW.blit(score_text, ((WIDTH - score_text.get_width()) // 2, (SCORE_HEIGHT - score_text.get_height()) // 2)) # on affiche le score en haut à gauche
 
 # Fonction pour afficher le texte
@@ -217,6 +243,7 @@ def main():
             snake[0][1] < SCORE_HEIGHT or snake[0][1] >= HEIGHT
         ) or len(snake) > 2 and snake[0] in snake[1:] or check_obstacle_collision(): # Ajouter la vérification avec lui-même
             WINDOW.fill(BLACK)
+            save_score(score)
             pygame.mixer.music.stop()
             game_over_sound.play()
             display_message(f'GAME OVER - Score : {score}', RED)
