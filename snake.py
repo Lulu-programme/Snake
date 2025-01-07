@@ -41,6 +41,7 @@ score_bonus = [i-20 for i in score_100]
  # Charger la police depuis les assets
 font = pygame.font.Font('assets/hack.ttf', 40)
 lcd_font = pygame.font.Font('assets/nokia.ttf', 30)
+current_music = 'main'
 
 # Charger et adapter les images
 apple_img = pygame.image.load('assets/apple.png')
@@ -55,20 +56,40 @@ body_img = pygame.image.load('assets/body_snake.png')
 body_img = pygame.transform.scale(body_img, (BLOCK_SIZE, BLOCK_SIZE))
 end_img = pygame.image.load('assets/end_snake.png')
 end_img = pygame.transform.scale(end_img, (BLOCK_SIZE, BLOCK_SIZE))
+grass_img = pygame.image.load('assets/grass.png')
+grass_img = pygame.transform.scale(grass_img, (BLOCK_SIZE, BLOCK_SIZE))
+dirt_img = pygame.image.load('assets/dirt.png')
+dirt_img = pygame.transform.scale(dirt_img, (BLOCK_SIZE, BLOCK_SIZE))
 
 # Charger la musique
 bite_sound = pygame.mixer.Sound('assets/apple_bite.ogg')
+coin_sound = pygame.mixer.Sound('assets/Coin.wav')
 game_over_sound = pygame.mixer.Sound('assets/game_over.wav')
-
-# charger la musique de fond
 pygame.mixer.music.load('assets/victory.mp3')
-pygame.mixer.music.play(-1) # -1 permet de jouer le son en boucle
+pygame.mixer.music.play(-1)
 
 # Réglage du volume
 bite_sound.set_volume(1.0)
-pygame.mixer.music.set_volume(0.3)
+coin_sound.set_volume(1.0)
+pygame.mixer.music.set_volume(0.5)
 
-# -----   Fonction générale   -----
+# Fonction pour changer de musique en fonction de la nourriture
+def play_main_music():
+    global current_music
+    if current_music != "main":  # Ne joue que si ce n'est pas déjà la musique principale
+        pygame.mixer.music.stop()
+        pygame.mixer.music.load('assets/victory.mp3')
+        pygame.mixer.music.play(-1)
+        current_music = "main"  # Met à jour l'état
+
+def play_bonus_music():
+    global current_music
+    if current_music != "bonus":  # Ne joue que si ce n'est pas déjà la musique de bonus
+        pygame.mixer.music.stop()
+        pygame.mixer.music.load('assets/thunder.mp3')
+        pygame.mixer.music.play(-1)
+        current_music = "bonus"  # Met à jour l'état
+
 # Fonction pour enregistrer le score
 def save_score(score):
     try:
@@ -85,6 +106,12 @@ def generate_position():
         position = (x, y)
         if position not in snake and position not in obstacles:
             return position
+        
+# Fonction pour dessiner le fond
+def draw_background(img):
+    for x in range(0, WIDTH, BLOCK_SIZE):
+        for y in range(0, HEIGHT, BLOCK_SIZE):
+            WINDOW.blit(img, (x, y))
 
 # -----   Fonction du serpent   -----
 # Position initiale du serpent (x, y)
@@ -272,12 +299,13 @@ def main():
             
         # Vérifier les collisions avec la nourriture
         if snake[0] == (food_x, food_y):
-            bite_sound.play()
             food_x, food_y = generate_food() # Générer la nouvelle position de la nourriture
             if bonus_food:
+                coin_sound.play()
                 score += 20 # on augmente le score de 20 pour le bonus
                 bonus_food = False
             else:
+                bite_sound.play()
                 score += 10 # On augmente le score par 10
                 if score in score_bonus:
                     bonus_food = True
@@ -288,9 +316,14 @@ def main():
                 obstacles = generate_obstacle() # On change les obstacles
         else:
             snake.pop() # Retirer le dernier segment si pas de nourriture mangée
+            
+        if bonus_food:
+            play_bonus_music()
+        else:
+            play_main_music()
 
         # Remplir l'écran
-        WINDOW.fill(SCREEN)
+        draw_background(dirt_img if bonus_food else grass_img)
         
         # Dessiner le cadre
         draw_game_frame()
@@ -302,11 +335,7 @@ def main():
         draw_obstacle()
         
         # Dessiner la nourriture
-        if bonus_food:
-            food = pumpkin_img
-        else:
-            food = apple_img
-        draw_food(food)
+        draw_food(pumpkin_img if bonus_food else apple_img)
 
         # Dessiner le serpent
         for index, segment in enumerate(snake):
